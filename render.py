@@ -239,8 +239,8 @@ async def encaminhar_para_grupo(update: Update, context: ContextTypes.DEFAULT_TY
             username = linhas[1][2:].strip()
             valor = linhas[2][2:].strip().replace('R$', '').strip()
             item_id = linhas[3][2:].strip()
-            
-            # Verifique se o ID já existe no dicionário de dados
+
+            # Verifique se o ID já existe no banco de dados
             conn = connect_db()
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM grupos WHERE id = %s", (item_id,))
@@ -250,21 +250,26 @@ async def encaminhar_para_grupo(update: Update, context: ContextTypes.DEFAULT_TY
                 cursor.close()
                 conn.close()
                 return
-            
-            # Envie a nova mensagem formatada para o grupo público e armazene o ID da mensagem
+
+            # Envie a nova mensagem formatada para o grupo público
             try:
                 nova_mensagem = f'🎬 {titulo}\n👤 {username}\n💲 R$ {valor}\n🆔 {item_id}'
                 public_message = await context.bot.send_message(chat_id=PUBLIC_GROUP_ID, text=nova_mensagem)
-                
+
                 # Insira o novo grupo no banco de dados
                 cursor.execute(
-                    "INSERT INTO grupos (titulo, username, valor, public_message_id) VALUES (%s, %s, %s, %s)",
+                    "INSERT INTO grupos (titulo, username, valor, public_message_id) VALUES (%s, %s, %s, %s) RETURNING id",
                     (titulo, username, valor, public_message.message_id)
                 )
+                new_id = cursor.fetchone()[0]
                 conn.commit()
                 cursor.close()
                 conn.close()
-                
+
+                # Atualiza a mensagem original com o novo ID gerado
+                await context.bot.edit_message_text(chat_id=PUBLIC_GROUP_ID, message_id=public_message.message_id,
+                    text=f'🎬 {titulo}\n👤 {username}\n💲 R$ {valor}\n🆔 {new_id}')
+
                 await update.message.reply_text(f'✅ Mensagem enviada e grupo adicionado com sucesso!')
             except Exception as e:
                 await update.message.reply_text(f"Erro ao enviar mensagem: {e}")
