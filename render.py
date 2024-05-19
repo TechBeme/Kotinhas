@@ -71,7 +71,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "🎁 Quer economizar ainda mais? Utilize na sua primeira compra o cupom: `JBX3197` para ganhar R$ 5,00 de desconto!\n\n"
         "❓ Use /ajuda para ver a lista de comandos disponíveis e começar a usar o bot."
     )
-    await update.message.reply_text(mensagem_boas_vindas)
+    await update.message.reply_text(mensagem_boas_vindas, parse_mode='Markdown')
 
 async def grupos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     numero_de_grupos = len(dados['grupos'])
