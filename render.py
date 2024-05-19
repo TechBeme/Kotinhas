@@ -17,6 +17,7 @@ def run():
 
 def keep_alive():
     t = threading.Thread(target=run)
+    t.daemon = True
     t.start()
 
 # Token do bot fornecido pelo BotFather
@@ -182,7 +183,6 @@ async def pesquisar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(resposta)
 
 # Função para lidar com mensagens encaminhadas
-# Função para lidar com mensagens encaminhadas
 async def encaminhar_para_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     mensagem = update.message.text
     if mensagem:
@@ -202,9 +202,10 @@ async def encaminhar_para_grupo(update: Update, context: ContextTypes.DEFAULT_TY
                     await update.message.reply_text(f'❌ Grupo com ID {item_id} já existe.')
                     return
             
-            # Envie a mensagem formatada para o grupo público e armazene o ID da mensagem
+            # Envie a nova mensagem formatada para o grupo público e armazene o ID da mensagem
             try:
-                public_message = await context.bot.forward_message(chat_id=PUBLIC_GROUP_ID, from_chat_id=update.message.chat_id, message_id=update.message.message_id)
+                nova_mensagem = f'🎬 {titulo}\n👤 {username}\n💲 R$ {valor}\n🆔 {item_id}'
+                public_message = await context.bot.send_message(chat_id=PUBLIC_GROUP_ID, text=nova_mensagem)
                 dados['grupos'].append({
                     "titulo": titulo,
                     "username": username,
@@ -212,7 +213,7 @@ async def encaminhar_para_grupo(update: Update, context: ContextTypes.DEFAULT_TY
                     "id": item_id,
                     "public_message_id": public_message.message_id
                 })
-                await update.message.reply_text(f'✅ Mensagem encaminhada e grupo adicionado com sucesso!')
+                await update.message.reply_text(f'✅ Mensagem enviada e grupo adicionado com sucesso!')
             except Exception as e:
                 await update.message.reply_text(f"Erro ao enviar mensagem: {e}")
         else:
