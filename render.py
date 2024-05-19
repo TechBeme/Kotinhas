@@ -130,24 +130,24 @@ async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     item_id = context.args[0]
-    grupo_removido = None
 
-    # Conecta ao banco de dados e verifica se o grupo existe
     conn = connect_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM grupos WHERE id = %s", (item_id,))
     grupo_removido = cursor.fetchone()
 
     if grupo_removido:
-        # Verifique se o usuário é o administrador ou o criador do grupo
         if f"@{update.message.from_user.username}" == ADMIN_USERNAME or grupo_removido[2] == f"@{update.message.from_user.username}":
             try:
                 await context.bot.delete_message(chat_id=PUBLIC_GROUP_ID, message_id=grupo_removido[4])
-                cursor.execute("DELETE FROM grupos WHERE id = %s", (item_id,))
-                conn.commit()
-                await update.message.reply_text(f'🗑️ O grupo "{grupo_removido[1]}" com ID {item_id} foi removido com sucesso.')
             except Exception as e:
-                await update.message.reply_text(f"Erro ao remover mensagem: {e}")
+                # Log the exception for debugging purposes
+                print(f"Erro ao remover mensagem: {e}")
+
+            # Remova o grupo do banco de dados, independentemente de a mensagem ter sido deletada com sucesso ou não
+            cursor.execute("DELETE FROM grupos WHERE id = %s", (item_id,))
+            conn.commit()
+            await update.message.reply_text(f'🗑️ O grupo com ID {item_id} foi removido com sucesso.')
         else:
             await update.message.reply_text('❌ Você não tem permissão para remover este grupo.')
     else:
