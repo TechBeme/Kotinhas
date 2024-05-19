@@ -156,6 +156,22 @@ async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     cursor.close()
     conn.close()
 
+async def meusgrupos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    username = f"@{update.message.from_user.username}"
+
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM grupos WHERE username = %s", (username,))
+    grupos = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    if not grupos:
+        await update.message.reply_text('❌ Você não adicionou nenhum grupo.')
+    else:
+        resposta = "\n\n".join([f"🎬 {item[1]}\n💲 R$ {item[3]}\n🆔 {item[0]}" for item in grupos])
+        await update.message.reply_text(resposta)
+
 async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     mensagem_ajuda = (
         "👋 Olá! Sou o bot do Kotas, seu assistente para gerenciar e compartilhar assinaturas. Vamos começar?\n\n"
@@ -184,6 +200,9 @@ async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Os anúncios dos grupos expiram automaticamente em 14 dias. Para remover um grupo antes desse prazo:\n"
         "1️⃣ Digite /remover seguido do ID do grupo.\n"
         "➡ Exemplo: /remover 0001.\n\n"
+
+        "👉 **Ver meus grupos:**\n"
+        "1️⃣ Digite /meusgrupos para ver a lista dos grupos que você adicionou.\n\n"
     )
     await update.message.reply_text(mensagem_ajuda, parse_mode='Markdown')
 
@@ -194,6 +213,7 @@ async def comandos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "🎬 /grupos - Mostra a lista de todos os grupos existentes.\n"
         "➕ /adicionar - Adiciona um novo grupo na lista.\n"
         "❌ /remover - Remove um grupo da lista pelo ID.\n"
+        "👤 /meusgrupos - Veja os grupos que você adicionou.\n"
         "🔍 /pesquisar - Busca todos os grupos com uma palavra-chave.\n"
         "📋 /comandos - Lista todos os comandos.\n"
     )
@@ -283,13 +303,14 @@ def main() -> None:
     application = ApplicationBuilder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("ajuda", ajuda))
     application.add_handler(CommandHandler("grupos", grupos))
     application.add_handler(CommandHandler("adicionar", adicionar))
     application.add_handler(CommandHandler("remover", remover))
-    application.add_handler(CommandHandler("ajuda", ajuda))
+    application.add_handler(CommandHandler("meusgrupos", meusgrupos))
     application.add_handler(CommandHandler("pesquisar", pesquisar))
     application.add_handler(CommandHandler("comandos", comandos))
-
+    
     # Adicione este handler para encaminhar mensagens
     application.add_handler(MessageHandler(filters.FORWARDED & filters.TEXT, encaminhar_para_grupo))
 
