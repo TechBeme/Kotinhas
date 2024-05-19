@@ -298,6 +298,22 @@ async def encaminhar_para_grupo(update: Update, context: ContextTypes.DEFAULT_TY
         else:
             await update.message.reply_text('❌ Mensagem encaminhada no formato incorreto.')
 
+async def enviar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message.from_user.username != ADMIN_USERNAME:
+        await update.message.reply_text('❌ Você não tem permissão para usar este comando.')
+        return
+    
+    if not context.args:
+        await update.message.reply_text('⚠️ Use o comando da seguinte forma: /enviar <mensagem>')
+        return
+    
+    mensagem = ' '.join(context.args)
+    try:
+        await context.bot.send_message(chat_id=PUBLIC_GROUP_ID, text=mensagem, parse_mode='Markdown')
+        await update.message.reply_text('✅ Mensagem enviada com sucesso!')
+    except Exception as e:
+        await update.message.reply_text(f"Erro ao enviar mensagem: {e}")
+
 def main() -> None:
     keep_alive()
     application = ApplicationBuilder().token(TOKEN).build()
@@ -310,6 +326,7 @@ def main() -> None:
     application.add_handler(CommandHandler("meusgrupos", meusgrupos))
     application.add_handler(CommandHandler("pesquisar", pesquisar))
     application.add_handler(CommandHandler("comandos", comandos))
+    application.add_handler(CommandHandler("enviar", enviar))
     
     # Adicione este handler para encaminhar mensagens
     application.add_handler(MessageHandler(filters.FORWARDED & filters.TEXT, encaminhar_para_grupo))
