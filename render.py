@@ -300,9 +300,6 @@ async def encaminhar_para_grupo(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def enviar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_username = update.message.from_user.username
-
-    # Mensagem de depuração para verificar o valor do nome de usuário
-    await update.message.reply_text(f'Debug: Seu username é @{user_username} e o ADMIN_USERNAME é {ADMIN_USERNAME}')
     
     if user_username != ADMIN_USERNAME.strip('@'):
         await update.message.reply_text('❌ Você não tem permissão para usar este comando.')
