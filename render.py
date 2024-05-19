@@ -1,4 +1,6 @@
 import os
+import psycopg2
+from psycopg2 import sql
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 from flask import Flask
@@ -19,6 +21,33 @@ def keep_alive():
     t = threading.Thread(target=run)
     t.daemon = True
     t.start()
+
+# Configurar variáveis de ambiente para a conexão com o PostgreSQL
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+# Função para conectar ao banco de dados PostgreSQL
+def connect_db():
+    return psycopg2.connect(DATABASE_URL)
+
+# Criar a tabela de grupos se não existir
+def create_table():
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS grupos (
+            id SERIAL PRIMARY KEY,
+            titulo TEXT NOT NULL,
+            username TEXT NOT NULL,
+            valor TEXT NOT NULL,
+            public_message_id INTEGER NOT NULL
+        )
+    """)
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+# Chamar a função para criar a tabela ao iniciar
+create_table()
 
 # Token do bot fornecido pelo BotFather
 TOKEN = os.getenv('TOKEN')
@@ -68,20 +97,23 @@ async def adicionar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     valor = context.args[0].replace(',', '.')
     titulo = ' '.join(context.args[1:])
-    item_id = len(dados['grupos']) + 1
+    username = f"@{update.message.from_user.username}"
 
-    dados['grupos'].append({
-        "titulo": titulo,
-        "username": f"@{update.message.from_user.username}",
-        "valor": valor,
-        "id": f"{item_id:04d}"
-    })
-
-    mensagem_grupo = f'🎬 {titulo}\n👤 @{update.message.from_user.username}\n💲 R$ {valor}\n🆔 {item_id:04d}'
+    mensagem_grupo = f'🎬 {titulo}\n👤 {username}\n💲 R$ {valor}'
 
     # Envia a mensagem para o grupo público e armazena o ID da mensagem
     public_message = await context.bot.send_message(chat_id=PUBLIC_GROUP_ID, text=mensagem_grupo)
-    dados['grupos'][-1]['public_message_id'] = public_message.message_id
+
+    # Conecta ao banco de dados e insere o novo grupo
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO grupos (titulo, username, valor, public_message_id) VALUES (%s, %s, %s, %s)",
+        (titulo, username, valor, public_message.message_id)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
 
     # Envia a mensagem para o usuário que adicionou o grupo
     await update.message.reply_text(f'✅ Grupo adicionado com sucesso!\n\n{mensagem_grupo}')
@@ -100,24 +132,29 @@ async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     item_id = context.args[0]
     grupo_removido = None
 
-    for grupo in dados['grupos']:
-        if grupo['id'] == item_id:
-            grupo_removido = grupo
-            break
+    # Conecta ao banco de dados e verifica se o grupo existe
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM grupos WHERE id = %s", (item_id,))
+    grupo_removido = cursor.fetchone()
 
     if grupo_removido:
         # Verifique se o usuário é o administrador ou o criador do grupo
-        if f"@{update.message.from_user.username}" == ADMIN_USERNAME or grupo_removido["username"] == f"@{update.message.from_user.username}":
+        if f"@{update.message.from_user.username}" == ADMIN_USERNAME or grupo_removido[2] == f"@{update.message.from_user.username}":
             try:
-                await context.bot.delete_message(chat_id=PUBLIC_GROUP_ID, message_id=grupo_removido['public_message_id'])
-                dados['grupos'].remove(grupo_removido)
-                await update.message.reply_text(f'🗑️ O grupo "{grupo_removido["titulo"]}" com ID {item_id} foi removido com sucesso.')
+                await context.bot.delete_message(chat_id=PUBLIC_GROUP_ID, message_id=grupo_removido[4])
+                cursor.execute("DELETE FROM grupos WHERE id = %s", (item_id,))
+                conn.commit()
+                await update.message.reply_text(f'🗑️ O grupo "{grupo_removido[1]}" com ID {item_id} foi removido com sucesso.')
             except Exception as e:
                 await update.message.reply_text(f"Erro ao remover mensagem: {e}")
         else:
             await update.message.reply_text('❌ Você não tem permissão para remover este grupo.')
     else:
         await update.message.reply_text(f'❌ Grupo com ID {item_id} não encontrado.')
+
+    cursor.close()
+    conn.close()
 
 async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     mensagem_ajuda = (
@@ -174,12 +211,19 @@ async def pesquisar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     palavra_chave = ' '.join(context.args).lower()
-    resultados = [grupo for grupo in dados['grupos'] if palavra_chave in grupo['titulo'].lower()]
+
+    # Conecta ao banco de dados e realiza a pesquisa
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM grupos WHERE LOWER(titulo) LIKE %s", ('%' + palavra_chave + '%',))
+    resultados = cursor.fetchall()
+    cursor.close()
+    conn.close()
 
     if not resultados:
         await update.message.reply_text('❌ Nenhum grupo encontrado com essa palavra-chave.')
     else:
-        resposta = "\n\n".join([f"🎬 {item['titulo']}\n👤 {item['username']}\n💲 R$ {item['valor']}\n🆔 {item['id']}" for item in resultados])
+        resposta = "\n\n".join([f"🎬 {item[1]}\n👤 {item[2]}\n💲 R$ {item[3]}\n🆔 {item[0]}" for item in resultados])
         await update.message.reply_text(resposta)
 
 # Função para lidar com mensagens encaminhadas
