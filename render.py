@@ -241,25 +241,35 @@ async def encaminhar_para_grupo(update: Update, context: ContextTypes.DEFAULT_TY
             item_id = linhas[3][2:].strip()
             
             # Verifique se o ID já existe no dicionário de dados
-            for grupo in dados['grupos']:
-                if grupo['id'] == item_id:
-                    await update.message.reply_text(f'❌ Grupo com ID {item_id} já existe.')
-                    return
+            conn = connect_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM grupos WHERE id = %s", (item_id,))
+            grupo_existe = cursor.fetchone()
+            if grupo_existe:
+                await update.message.reply_text(f'❌ Grupo com ID {item_id} já existe.')
+                cursor.close()
+                conn.close()
+                return
             
             # Envie a nova mensagem formatada para o grupo público e armazene o ID da mensagem
             try:
                 nova_mensagem = f'🎬 {titulo}\n👤 {username}\n💲 R$ {valor}\n🆔 {item_id}'
                 public_message = await context.bot.send_message(chat_id=PUBLIC_GROUP_ID, text=nova_mensagem)
-                dados['grupos'].append({
-                    "titulo": titulo,
-                    "username": username,
-                    "valor": valor,
-                    "id": item_id,
-                    "public_message_id": public_message.message_id
-                })
+                
+                # Insira o novo grupo no banco de dados
+                cursor.execute(
+                    "INSERT INTO grupos (titulo, username, valor, public_message_id) VALUES (%s, %s, %s, %s)",
+                    (titulo, username, valor, public_message.message_id)
+                )
+                conn.commit()
+                cursor.close()
+                conn.close()
+                
                 await update.message.reply_text(f'✅ Mensagem enviada e grupo adicionado com sucesso!')
             except Exception as e:
                 await update.message.reply_text(f"Erro ao enviar mensagem: {e}")
+                cursor.close()
+                conn.close()
         else:
             await update.message.reply_text('❌ Mensagem encaminhada no formato incorreto.')
 
