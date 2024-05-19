@@ -50,7 +50,7 @@ def create_table():
 create_table()
 
 # Token do bot fornecido pelo BotFather
-TOKENS = [os.getenv('TOKEN1'), os.getenv('TOKEN2')]
+TOKEN = os.getenv('TOKEN')
 
 # ID do grupo público onde as mensagens serão postadas
 PUBLIC_GROUP_ID = int(os.getenv('PUBLIC_GROUP_ID'))
@@ -300,29 +300,21 @@ async def encaminhar_para_grupo(update: Update, context: ContextTypes.DEFAULT_TY
 
 def main() -> None:
     keep_alive()
+    application = ApplicationBuilder().token(TOKEN).build()
 
-    applications = []
-    for i, token in enumerate(TOKENS):
-        application = ApplicationBuilder().token(token).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("ajuda", ajuda))
+    application.add_handler(CommandHandler("grupos", grupos))
+    application.add_handler(CommandHandler("adicionar", adicionar))
+    application.add_handler(CommandHandler("remover", remover))
+    application.add_handler(CommandHandler("meusgrupos", meusgrupos))
+    application.add_handler(CommandHandler("pesquisar", pesquisar))
+    application.add_handler(CommandHandler("comandos", comandos))
+    
+    # Adicione este handler para encaminhar mensagens
+    application.add_handler(MessageHandler(filters.FORWARDED & filters.TEXT, encaminhar_para_grupo))
 
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("ajuda", ajuda))
-        application.add_handler(CommandHandler("grupos", grupos))
-        application.add_handler(CommandHandler("adicionar", adicionar))
-        application.add_handler(CommandHandler("remover", remover))
-        application.add_handler(CommandHandler("meusgrupos", meusgrupos))
-        application.add_handler(CommandHandler("pesquisar", pesquisar))
-        application.add_handler(CommandHandler("comandos", comandos))
-        
-        # Adicione este handler para encaminhar mensagens
-        application.add_handler(MessageHandler(filters.FORWARDED & filters.TEXT, encaminhar_para_grupo))
-
-        applications.append(application)
-
-    # Iniciar cada aplicação em uma thread separada
-    threads = [threading.Thread(target=app.run_polling) for app in applications]
-    for thread in threads:
-        thread.start()
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
