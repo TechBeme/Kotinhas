@@ -313,8 +313,12 @@ async def enviar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     
     mensagem = ' '.join(context.args)
+    
+    # Formatar a mensagem com quebras de linha
+    mensagem_formatada = mensagem.replace('\\n', '\n')
+    
     try:
-        await context.bot.send_message(chat_id=PUBLIC_GROUP_ID, text=mensagem, parse_mode='Markdown')
+        await context.bot.send_message(chat_id=PUBLIC_GROUP_ID, text=mensagem_formatada, parse_mode='Markdown')
         await update.message.reply_text('✅ Mensagem enviada com sucesso!')
     except Exception as e:
         await update.message.reply_text(f"Erro ao enviar mensagem: {e}")
